@@ -174,9 +174,16 @@ The file is executable code, by design. Keep it writable only by you.
 
 The Terminal submenu saves an application name with `oshelly terminal`, for
 example `Ghostty`. The CLI writes it per platform to
-`~/.config/oshelly/settings.json` and passes it to `open -a`. That works for
-Ghostty because `open -a Ghostty <script>` hands the `.command` file to
-Ghostty's file handler, which runs it. The same command works from a terminal:
+`~/.config/oshelly/settings.json`.
+
+Ghostty is handled separately. Opening a `.command` file through Ghostty's
+file handler asks for confirmation every time, and Ghostty has no setting to
+turn that off. For Ghostty, `oshelly` starts a new Ghostty instance with
+`--initial-command`, which runs the script without the dialog. That instance
+quits when its window closes. The running Ghostty is left alone, so a second
+Dock icon may appear until the window closes.
+
+The same command works from a terminal:
 
 ```sh
 oshelly terminal Ghostty
