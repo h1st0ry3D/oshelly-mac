@@ -28,6 +28,8 @@ const (
 	ActionRun
 	// ActionEdit opens the config in the default text editor.
 	ActionEdit
+	// ActionSetTerminal records which terminal opens a command.
+	ActionSetTerminal
 	// ActionReload re-reads the config, for after a hand edit.
 	ActionReload
 	// ActionQuit leaves.
@@ -50,6 +52,15 @@ type Item struct {
 	Action Action
 	// Name is the command an ActionRun will launch.
 	Name string
+	// Terminal is the choice an ActionSetTerminal will save.
+	Terminal string
+	// Checked draws a tick.
+	Checked bool
+	// Checkable makes the item a checkbox. It is not inferred from Checked,
+	// because an unticked checkbox and an ordinary item are different things.
+	Checkable bool
+	// Children make this a submenu. Empty for an ordinary item.
+	Children []*Item
 	// StatusDetail marks the line carrying the reason an action failed, which
 	// is not a command's row and has no action of its own.
 	StatusDetail bool
@@ -72,6 +83,34 @@ var Idle = Status{Text: "Run a command"}
 type Model struct {
 	Status Status
 	Items  []*Item
+}
+
+// TerminalChoices are the applications offered on macOS. A value is passed to
+// `open -a`, so it is an application name, not a path.
+//
+// The list is fixed because Launch Services can find an application by name
+// without this having to scan /Applications, and a name that is not installed
+// is refused by `open` with a message the status line shows.
+var TerminalChoices = []struct {
+	Value string
+	Label string
+}{
+	{"", "System default"},
+	{"Ghostty", "Ghostty"},
+	{"Terminal", "Terminal"},
+	{"iTerm", "iTerm"},
+	{"Warp", "Warp"},
+	{"kitty", "kitty"},
+	{"WezTerm", "WezTerm"},
+	{"Alacritty", "Alacritty"},
+}
+
+// TerminalTitle is what the submenu reads when it is closed.
+func TerminalTitle(choice string) string {
+	if choice == "" {
+		return "Terminal: System default"
+	}
+	return "Terminal: " + choice
 }
 
 // Build turns settings into the menu.
@@ -123,6 +162,30 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 			Disabled:        busy,
 		})
 	}
+
+	terminalItem := &Item{
+		Title:           TerminalTitle(s.TerminalChoice),
+		Tooltip:         "Choose the terminal that opens a command",
+		SeparatorBefore: true,
+		Action:          ActionNone,
+		Disabled:        busy,
+	}
+	for _, choice := range TerminalChoices {
+		tooltip := "Open commands in " + choice.Label
+		if choice.Value == "" {
+			tooltip = "Use the system default terminal"
+		}
+		terminalItem.Children = append(terminalItem.Children, &Item{
+			Title:     choice.Label,
+			Tooltip:   tooltip,
+			Checked:   choice.Value == s.TerminalChoice,
+			Checkable: true,
+			Action:    ActionSetTerminal,
+			Terminal:  choice.Value,
+			Disabled:  busy,
+		})
+	}
+	m.Items = append(m.Items, terminalItem)
 
 	m.Items = append(m.Items,
 		&Item{
@@ -247,6 +310,11 @@ func ForEdit(res cli.Result) Status {
 	return forResult(res, "Editing the config.", "Could not open the config.")
 }
 
+// ForTerminal builds the line that reports a saved terminal choice.
+func ForTerminal(res cli.Result) Status {
+	return forResult(res, "Terminal choice saved.", "Could not set the terminal.")
+}
+
 // forResult is the shape every completed action shares: a success uses the
 // CLI's own message, and a failure keeps the CLI's reason under a line saying
 // what failed.
@@ -300,10 +368,20 @@ func (m *Model) Describe() string {
 			b.WriteString("\n--")
 		}
 		flags := ""
+		if it.Checked {
+			flags += " [x]"
+		}
 		if it.Disabled {
 			flags += " [disabled]"
 		}
 		b.WriteString("\n  " + it.Title + flags)
+		for _, child := range it.Children {
+			line := child.Title
+			if child.Checked {
+				line = "[x] " + line
+			}
+			b.WriteString("\n      - " + line)
+		}
 	}
 	return b.String()
 }

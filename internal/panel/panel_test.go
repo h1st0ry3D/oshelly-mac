@@ -43,6 +43,36 @@ func TestEveryCommandGetsOneRowThatRunsIt(t *testing.T) {
 	if it := find(m, "Edit config"); it == nil || it.Action != ActionEdit {
 		t.Error("there is no Edit config item")
 	}
+	if it := find(m, "Terminal: System default"); it == nil {
+		t.Error("there is no Terminal submenu")
+	}
+}
+
+// The tick has to be on the saved choice, not on the first entry or on none.
+func TestTheTerminalChoiceIsTicked(t *testing.T) {
+	s := settings("Restart audio")
+	s.TerminalChoice = "Ghostty"
+	m := Build(s, Idle, false)
+
+	terminal := find(m, "Terminal: Ghostty")
+	if terminal == nil {
+		t.Fatalf("no Terminal submenu for Ghostty:\n%s", m.Describe())
+	}
+	var ghostty, system *Item
+	for _, child := range terminal.Children {
+		switch child.Title {
+		case "Ghostty":
+			ghostty = child
+		case "System default":
+			system = child
+		}
+	}
+	if ghostty == nil || !ghostty.Checked {
+		t.Error("Ghostty is not ticked")
+	}
+	if system == nil || system.Checked {
+		t.Error("System default is ticked while Ghostty is the choice")
+	}
 }
 
 // A separator before the first command is what tells it apart from the status
@@ -59,7 +89,7 @@ func TestTheFirstCommandIsSeparatedFromTheStatus(t *testing.T) {
 
 func TestBusyRefusesEveryCommandAndReload(t *testing.T) {
 	m := Build(settings("Restart audio", "Update"), Idle, true)
-	for _, want := range []string{"Restart audio", "Update", "Edit config", "Reload"} {
+	for _, want := range []string{"Restart audio", "Update", "Terminal: System default", "Edit config", "Reload"} {
 		it := find(m, want)
 		if it == nil {
 			t.Fatalf("no item %q", want)
@@ -147,6 +177,24 @@ func TestForRunFallsBackToTheMessage(t *testing.T) {
 	st := ForRun(cli.Result{Code: -1, Message: "signal: killed"}, "Update")
 	if st.Detail != "signal: killed" {
 		t.Errorf("detail = %q", st.Detail)
+	}
+}
+
+func TestForTerminalReportsBothOutcomes(t *testing.T) {
+	ok := ForTerminal(cli.Result{Code: 0, Message: "terminal = Ghostty on darwin."})
+	if ok.Error {
+		t.Error("a saved terminal was marked as an error")
+	}
+	if !strings.Contains(ok.Text, "Ghostty") {
+		t.Errorf("text = %q", ok.Text)
+	}
+
+	bad := ForTerminal(cli.Result{Code: 3, Detail: "open -a Ghostty: no such application"})
+	if !bad.Error {
+		t.Error("a failed terminal change was not marked as an error")
+	}
+	if bad.Detail == "" {
+		t.Error("the reason was dropped")
 	}
 }
 

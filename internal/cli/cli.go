@@ -56,12 +56,16 @@ type Command struct {
 
 // Settings is what `list --json` prints.
 type Settings struct {
-	Version  int       `json:"version"`
-	Path     string    `json:"path"`
-	Exists   bool      `json:"exists"`
-	Platform string    `json:"platform"`
-	Terminal string    `json:"terminal"`
-	Commands []Command `json:"commands"`
+	Version  int    `json:"version"`
+	Path     string `json:"path"`
+	Exists   bool   `json:"exists"`
+	Platform string `json:"platform"`
+	// Terminal is the program or launcher in use here, for a label.
+	Terminal string `json:"terminal"`
+	// TerminalChoice is the saved choice for this Mac, or empty for the system
+	// default. It is what the Terminal submenu ticks.
+	TerminalChoice string    `json:"terminalChoice"`
+	Commands       []Command `json:"commands"`
 }
 
 // Empty reports whether there is nothing to offer.
@@ -209,6 +213,19 @@ func (c *Client) Run(ctx context.Context, name string) Result {
 // Edit asks oshelly to open the config in the default text editor.
 func (c *Client) Edit(ctx context.Context) Result {
 	res, err := c.run(ctx, "edit")
+	if err != nil {
+		return Result{Code: -1, Message: err.Error(), Detail: err.Error()}
+	}
+	return res
+}
+
+// SetTerminal records the terminal to use on this Mac. An empty name means the
+// system default.
+func (c *Client) SetTerminal(ctx context.Context, name string) Result {
+	if name == "" {
+		name = "default"
+	}
+	res, err := c.run(ctx, "terminal", name)
 	if err != nil {
 		return Result{Code: -1, Message: err.Error(), Detail: err.Error()}
 	}

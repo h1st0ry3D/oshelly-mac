@@ -157,34 +157,58 @@ func (a *app) render() {
 // a later render can find it again.
 func (a *app) draw(model *panel.Model) {
 	a.roots, a.all = nil, nil
-	for _, it := range model.Items {
-		if it.SeparatorBefore {
-			// The blank is a real item on screen and has to be in all as
-			// well, or every title after the first separator would be set on
-			// the item above it.
-			blank := a.blank()
-			a.roots = append(a.roots, blank)
-			a.all = append(a.all, blank)
-		}
-		item := a.create(it)
-		a.roots = append(a.roots, item)
+
+	keep := func(parent *systray.MenuItem, item *systray.MenuItem) {
 		a.all = append(a.all, item)
-		a.wire(item, callOf(it))
+		if parent == nil {
+			a.roots = append(a.roots, item)
+		}
 	}
+
+	var walk func(parent *systray.MenuItem, items []*panel.Item)
+	walk = func(parent *systray.MenuItem, items []*panel.Item) {
+		for _, it := range items {
+			if it.SeparatorBefore {
+				// The blank is a real item on screen and has to be in all as
+				// well, or every title after the first separator would be set
+				// on the item above it.
+				keep(parent, a.blank(parent))
+			}
+			item := a.create(parent, it)
+			keep(parent, item)
+			a.wire(item, callOf(it))
+			walk(item, it.Children)
+		}
+	}
+	walk(nil, model.Items)
+
 	log.Printf("menu rebuilt: %s", model.Summary())
 }
 
 // create makes one item from the model.
-func (a *app) create(it *panel.Item) *systray.MenuItem {
-	item := systray.AddMenuItem(it.Title, it.Tooltip)
+func (a *app) create(parent *systray.MenuItem, it *panel.Item) *systray.MenuItem {
+	var item *systray.MenuItem
+	switch {
+	case parent == nil:
+		item = systray.AddMenuItem(it.Title, it.Tooltip)
+	case it.Checkable:
+		item = parent.AddSubMenuItemCheckbox(it.Title, it.Tooltip, it.Checked)
+	default:
+		item = parent.AddSubMenuItem(it.Title, it.Tooltip)
+	}
 	setEnabled(item, !it.Disabled)
 	return item
 }
 
 // blank is the line between blocks. A menu bar has no separator of its own for
 // this, so it is an empty item that cannot be clicked.
-func (a *app) blank() *systray.MenuItem {
-	item := systray.AddMenuItem("", "")
+func (a *app) blank(parent *systray.MenuItem) *systray.MenuItem {
+	var item *systray.MenuItem
+	if parent == nil {
+		item = systray.AddMenuItem("", "")
+	} else {
+		item = parent.AddSubMenuItem("", "")
+	}
 	setEnabled(item, false)
 	return item
 }
@@ -192,7 +216,7 @@ func (a *app) blank() *systray.MenuItem {
 // callOf is what clicking an item does. The model carries every argument the
 // action needs, which is why this is a copy and not a lookup by name.
 func callOf(it *panel.Item) call {
-	return call{action: it.Action, name: it.Name}
+	return call{action: it.Action, name: it.Name, terminal: it.Terminal}
 }
 
 // apply gives every item on screen what the model says it should have.
@@ -203,19 +227,31 @@ func callOf(it *panel.Item) call {
 // not rebuild the menu under the pointer.
 func apply(model *panel.Model, live []*systray.MenuItem) {
 	at := 0
-	for _, it := range model.Items {
-		if it.SeparatorBefore {
-			at++ // the blank item above has nothing to set
+	var walk func(items []*panel.Item)
+	walk = func(items []*panel.Item) {
+		for _, it := range items {
+			if it.SeparatorBefore {
+				at++ // the blank item above has nothing to set
+			}
+			if at >= len(live) {
+				return
+			}
+			item := live[at]
+			at++
+			item.SetTitle(it.Title)
+			item.SetTooltip(it.Tooltip)
+			setEnabled(item, !it.Disabled)
+			if it.Checkable {
+				if it.Checked {
+					item.Check()
+				} else {
+					item.Uncheck()
+				}
+			}
+			walk(it.Children)
 		}
-		if at >= len(live) {
-			return
-		}
-		item := live[at]
-		at++
-		item.SetTitle(it.Title)
-		item.SetTooltip(it.Tooltip)
-		setEnabled(item, !it.Disabled)
 	}
+	walk(model.Items)
 }
 
 // shapeOf is the structure of a menu: one line per item, saying where it sits
@@ -228,10 +264,16 @@ func apply(model *panel.Model, live []*systray.MenuItem) {
 // That is what apply is for.
 func shapeOf(items []*panel.Item) []string {
 	out := make([]string, 0, len(items))
-	for _, it := range items {
-		out = append(out, fmt.Sprintf("%d %s %t %t",
-			int(it.Action), it.Name, it.SeparatorBefore, it.StatusDetail))
+	var walk func(items []*panel.Item, depth int)
+	walk = func(items []*panel.Item, depth int) {
+		for _, it := range items {
+			out = append(out, fmt.Sprintf("%d %d %s %s %t %t %t %d",
+				depth, int(it.Action), it.Name, it.Terminal,
+				it.SeparatorBefore, it.StatusDetail, it.Checkable, len(it.Children)))
+			walk(it.Children, depth+1)
+		}
 	}
+	walk(items, 0)
 	return out
 }
 
@@ -249,8 +291,9 @@ func sameShape(a, b []string) bool {
 
 // call is everything a menu item needs to say what it does when clicked.
 type call struct {
-	action panel.Action
-	name   string
+	action   panel.Action
+	name     string
+	terminal string
 }
 
 // wire sends every click on an item to run.
@@ -268,6 +311,10 @@ func (a *app) run(c call) {
 	// oshelly is missing offers a reload, because nothing else re-reads once
 	// it appears, and quit has to work in that state too.
 	switch c.action {
+	case panel.ActionNone:
+		// A submenu parent opens its children. It has a click channel like
+		// any other item, and must not fall through to launching a command.
+		return
 	case panel.ActionQuit:
 		log.Println("quitting")
 		systray.Quit()
@@ -294,6 +341,9 @@ func (a *app) run(c call) {
 	case panel.ActionEdit:
 		log.Println("opening the config")
 		status = panel.ForEdit(client.Edit(context.Background()))
+	case panel.ActionSetTerminal:
+		log.Printf("setting terminal to %q", c.terminal)
+		status = panel.ForTerminal(client.SetTerminal(context.Background(), c.terminal))
 	default:
 		log.Printf("launching %q", c.name)
 		status = panel.ForRun(client.Run(context.Background(), c.name), c.name)

@@ -28,16 +28,21 @@ Restart audio
 Update system
 Tail the journal
 --
+Terminal: Ghostty  ▸
+--
 Edit config
 Reload
 Quit
 ```
 
-Clicking a name closes the menu and starts the command. `Edit config` opens the
-config in the default text editor; the CLI creates the file with a commented
-header if it does not exist yet. `Reload` re-reads the config after you edit it;
-the app also re-reads after every launch, so a command added in a terminal
-shows up the next time the menu opens.
+Clicking a name closes the menu and starts the command. `Terminal` opens a
+submenu with the system default and the common terminal applications, with a
+tick on the saved choice. Choose Ghostty once and every command opens there.
+Choose System default to clear the choice.
+`Edit config` opens the config in the default text editor; the CLI creates the
+file with a commented header if it does not exist yet. `Reload` re-reads the
+config after you edit it; the app also re-reads after every launch, so a command
+added in a terminal shows up the next time the menu opens.
 
 When nothing is configured, the menu says so and names the file to edit. When
 the config will not parse, it shows the line number and reason instead of
@@ -167,12 +172,22 @@ The file is executable code, by design. Keep it writable only by you.
 
 ## Which terminal
 
-The CLI asks macOS for the default handler for `.command` files through
-`open`. That is usually Terminal, and it is whatever you have registered if
-you use iTerm or another terminal that claims the type.
+The Terminal submenu saves an application name with `oshelly terminal`, for
+example `Ghostty`. The CLI writes it per platform to
+`~/.config/oshelly/settings.json` and passes it to `open -a`. That works for
+Ghostty because `open -a Ghostty <script>` hands the `.command` file to
+Ghostty's file handler, which runs it. The same command works from a terminal:
 
-`OSHELLY_TERMINAL` overrides it with an application name or bundle path, which
-the CLI passes to `open -a`:
+```sh
+oshelly terminal Ghostty
+```
+
+With no saved choice, the CLI asks macOS for the default handler for `.command`
+files through `open`. That is usually Terminal, and it is whatever you have
+registered if you use iTerm or another terminal that claims the type.
+
+`OSHELLY_TERMINAL` is a session override and wins over the saved choice. It is
+passed to `open -a`:
 
 ```sh
 OSHELLY_TERMINAL=iTerm oshelly run "Update"

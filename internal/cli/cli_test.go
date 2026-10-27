@@ -139,6 +139,18 @@ func TestEditCallsTheCLI(t *testing.T) {
 	}
 }
 
+func TestSetTerminalCallsTheCLI(t *testing.T) {
+	path := fake(t, `printf 'terminal = Ghostty on darwin.\n'; exit 0`)
+	client := &Client{Path: path}
+	res := client.SetTerminal(context.Background(), "Ghostty")
+	if !res.OK() {
+		t.Fatalf("exit %d, detail %q", res.Code, res.Detail)
+	}
+	if !strings.Contains(res.Message, "Ghostty") {
+		t.Errorf("message = %q", res.Message)
+	}
+}
+
 func TestFlattenMakesOneLine(t *testing.T) {
 	got := flatten("first line\r\nsecond   line\n")
 	if got != "first line second line" {

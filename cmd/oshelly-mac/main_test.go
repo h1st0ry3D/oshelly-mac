@@ -51,6 +51,23 @@ func TestTheShapeChangesOnlyWhenTheMenuDoes(t *testing.T) {
 	}
 }
 
+// Changing the terminal ticks a different submenu entry. The menu's shape is
+// the same, so the tick changes in place rather than rebuilding under the
+// pointer.
+func TestChangingTheTerminalDoesNotRebuildTheMenu(t *testing.T) {
+	before := settings("one")
+	before.TerminalChoice = ""
+	after := settings("one")
+	after.TerminalChoice = "Ghostty"
+
+	if !sameShape(
+		shapeOfMenu(before, panel.Idle),
+		shapeOfMenu(after, panel.Idle),
+	) {
+		t.Error("changing the terminal changed the menu shape")
+	}
+}
+
 // A reason is a line of its own, so one appearing does change the shape, and
 // its text does not.
 func TestAReasonAddsALineWithoutItsTextChangingTheShape(t *testing.T) {
