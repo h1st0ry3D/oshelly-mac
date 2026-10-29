@@ -25,7 +25,7 @@ what a name means or which terminal opens.
 Run a command
 --
 Restart audio
-Update system
+Update system  ⏻
 Tail the journal
 --
 Terminal: Ghostty  ▸
@@ -35,6 +35,8 @@ Edit config
 Reload
 Quit
 ```
+
+![the menu](preview.png)
 
 Clicking a name closes the menu and starts the command. `Terminal` opens a
 submenu with the system default and the common terminal applications, with a
@@ -50,6 +52,7 @@ power button.
 With Terminal or iTerm, the close setting ends the shell; whether the window
 closes depends on that terminal's profile. Ghostty closes its transient
 instance when the window closes.
+
 `Edit config` opens the config in the default text editor; the CLI creates the
 file with a commented header if it does not exist yet. `Reload` re-reads the
 config after you edit it; the app also re-reads after every launch, so a command
