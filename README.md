@@ -29,6 +29,7 @@ Update system
 Tail the journal
 --
 Terminal: Ghostty  ▸
+Close after run  ▸
 --
 Edit config
 Reload
@@ -39,6 +40,16 @@ Clicking a name closes the menu and starts the command. `Terminal` opens a
 submenu with the system default and the common terminal applications, with a
 tick on the saved choice. Choose Ghostty once and every command opens there.
 Choose System default to clear the choice.
+
+`Close after run` opens a checkbox per command. A command with it on shows a
+power glyph next to its name, and its terminal ends when the command finishes.
+The default is to leave the terminal open. A menu bar menu cannot hold a button
+inside a row, so this submenu is the native equivalent of the Omarchy panel's
+power button.
+
+With Terminal or iTerm, the close setting ends the shell; whether the window
+closes depends on that terminal's profile. Ghostty closes its transient
+instance when the window closes.
 `Edit config` opens the config in the default text editor; the CLI creates the
 file with a commented header if it does not exist yet. `Reload` re-reads the
 config after you edit it; the app also re-reads after every launch, so a command
@@ -255,9 +266,9 @@ the file every time it is asked to run something.
 ## Design notes
 
 - The app runs one program and owns none of the behaviour. It reads a list with
-  `list --json`, draws it, and sends a name with `run`. The config parser and
-  the terminal selection live in one place, so this app and the Omarchy panel
-  cannot drift.
+  `list --json`, draws it, and sends a name with `run` or a setting with
+  `set close`. The config parser and the terminal selection live in one place,
+  so this app and the Omarchy panel cannot drift.
 - The app builds an argv array and runs no shell. A name with a space or a
   quote cannot become a second command on the way to the CLI.
 - The menu is built once and edited in place. systray adds items rather than

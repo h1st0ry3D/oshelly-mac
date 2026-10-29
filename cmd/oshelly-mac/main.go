@@ -344,6 +344,18 @@ func (a *app) run(c call) {
 	case panel.ActionSetTerminal:
 		log.Printf("setting terminal to %q", c.terminal)
 		status = panel.ForTerminal(client.SetTerminal(context.Background(), c.terminal))
+	case panel.ActionToggleClose:
+		a.mu.Lock()
+		closeNow := false
+		for _, command := range a.settings.Commands {
+			if command.Name == c.name {
+				closeNow = command.Close
+				break
+			}
+		}
+		a.mu.Unlock()
+		log.Printf("close after run=%v for %q", !closeNow, c.name)
+		status = panel.ForClose(client.SetClose(context.Background(), c.name, !closeNow))
 	default:
 		log.Printf("launching %q", c.name)
 		status = panel.ForRun(client.Run(context.Background(), c.name), c.name)

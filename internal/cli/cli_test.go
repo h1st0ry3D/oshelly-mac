@@ -139,6 +139,18 @@ func TestEditCallsTheCLI(t *testing.T) {
 	}
 }
 
+func TestSetCloseCallsTheCLI(t *testing.T) {
+	path := fake(t, `printf 'close after run = on for "Update".\n'; exit 0`)
+	client := &Client{Path: path}
+	res := client.SetClose(context.Background(), "Update", true)
+	if !res.OK() {
+		t.Fatalf("exit %d, detail %q", res.Code, res.Detail)
+	}
+	if !strings.Contains(res.Message, "Update") {
+		t.Errorf("message = %q", res.Message)
+	}
+}
+
 func TestSetTerminalCallsTheCLI(t *testing.T) {
 	path := fake(t, `printf 'terminal = Ghostty on darwin.\n'; exit 0`)
 	client := &Client{Path: path}

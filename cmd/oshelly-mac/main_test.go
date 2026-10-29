@@ -68,6 +68,21 @@ func TestChangingTheTerminalDoesNotRebuildTheMenu(t *testing.T) {
 	}
 }
 
+// Turning Close after run on changes a tick and adds a power glyph, not the
+// shape of the menu, so it is applied in place.
+func TestChangingCloseDoesNotRebuildTheMenu(t *testing.T) {
+	before := settings("one")
+	after := settings("one")
+	after.Commands[0].Close = true
+
+	if !sameShape(
+		shapeOfMenu(before, panel.Idle),
+		shapeOfMenu(after, panel.Idle),
+	) {
+		t.Error("changing Close after run changed the menu shape")
+	}
+}
+
 // A reason is a line of its own, so one appearing does change the shape, and
 // its text does not.
 func TestAReasonAddsALineWithoutItsTextChangingTheShape(t *testing.T) {

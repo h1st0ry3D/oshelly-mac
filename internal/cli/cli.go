@@ -52,6 +52,8 @@ type Command struct {
 	// Command is the shell text. It is carried for a UI that wants to show
 	// what a row will run; the name is what this client launches.
 	Command string `json:"command"`
+	// Close says the terminal should close when this command finishes.
+	Close bool `json:"close"`
 }
 
 // Settings is what `list --json` prints.
@@ -213,6 +215,19 @@ func (c *Client) Run(ctx context.Context, name string) Result {
 // Edit asks oshelly to open the config in the default text editor.
 func (c *Client) Edit(ctx context.Context) Result {
 	res, err := c.run(ctx, "edit")
+	if err != nil {
+		return Result{Code: -1, Message: err.Error(), Detail: err.Error()}
+	}
+	return res
+}
+
+// SetClose records whether a command closes its terminal when it finishes.
+func (c *Client) SetClose(ctx context.Context, name string, close bool) Result {
+	word := "off"
+	if close {
+		word = "on"
+	}
+	res, err := c.run(ctx, "set", "close", name, word)
 	if err != nil {
 		return Result{Code: -1, Message: err.Error(), Detail: err.Error()}
 	}

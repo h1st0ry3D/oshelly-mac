@@ -46,6 +46,34 @@ func TestEveryCommandGetsOneRowThatRunsIt(t *testing.T) {
 	if it := find(m, "Terminal: System default"); it == nil {
 		t.Error("there is no Terminal submenu")
 	}
+	if it := find(m, "Close after run"); it == nil {
+		t.Error("there is no Close after run submenu")
+	}
+}
+
+// A closed command carries the power glyph in the list, and its tick lives in
+// the settings submenu.
+func TestCloseAfterRunIsShownInBothPlaces(t *testing.T) {
+	s := settings("Update")
+	s.Commands[0].Close = true
+	m := Build(s, Idle, false)
+
+	if find(m, "Update  \u23fb") == nil {
+		t.Errorf("no power glyph on Update:\n%s", m.Describe())
+	}
+	menu := find(m, "Close after run")
+	if menu == nil {
+		t.Fatalf("no Close after run submenu:\n%s", m.Describe())
+	}
+	var update *Item
+	for _, child := range menu.Children {
+		if child.Title == "Update" {
+			update = child
+		}
+	}
+	if update == nil || !update.Checked {
+		t.Error("Update is not ticked in Close after run")
+	}
 }
 
 // The tick has to be on the saved choice, not on the first entry or on none.
@@ -89,7 +117,7 @@ func TestTheFirstCommandIsSeparatedFromTheStatus(t *testing.T) {
 
 func TestBusyRefusesEveryCommandAndReload(t *testing.T) {
 	m := Build(settings("Restart audio", "Update"), Idle, true)
-	for _, want := range []string{"Restart audio", "Update", "Terminal: System default", "Edit config", "Reload"} {
+	for _, want := range []string{"Restart audio", "Update", "Terminal: System default", "Close after run", "Edit config", "Reload"} {
 		it := find(m, want)
 		if it == nil {
 			t.Fatalf("no item %q", want)
@@ -177,6 +205,24 @@ func TestForRunFallsBackToTheMessage(t *testing.T) {
 	st := ForRun(cli.Result{Code: -1, Message: "signal: killed"}, "Update")
 	if st.Detail != "signal: killed" {
 		t.Errorf("detail = %q", st.Detail)
+	}
+}
+
+func TestForCloseReportsBothOutcomes(t *testing.T) {
+	ok := ForClose(cli.Result{Code: 0, Message: `close after run = on for "Update".`})
+	if ok.Error {
+		t.Error("a saved close setting was marked as an error")
+	}
+	if !strings.Contains(ok.Text, "Update") {
+		t.Errorf("text = %q", ok.Text)
+	}
+
+	bad := ForClose(cli.Result{Code: 3, Detail: "settings not usable"})
+	if !bad.Error {
+		t.Error("a failed close setting was not marked as an error")
+	}
+	if bad.Detail != "settings not usable" {
+		t.Errorf("detail = %q", bad.Detail)
 	}
 }
 

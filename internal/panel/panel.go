@@ -30,6 +30,9 @@ const (
 	ActionEdit
 	// ActionSetTerminal records which terminal opens a command.
 	ActionSetTerminal
+	// ActionToggleClose turns the close-after-run setting on or off for a
+	// command.
+	ActionToggleClose
 	// ActionReload re-reads the config, for after a hand edit.
 	ActionReload
 	// ActionQuit leaves.
@@ -153,14 +156,42 @@ func Build(s cli.Settings, status Status, busy bool) *Model {
 	}
 
 	for i, c := range s.Commands {
+		title := c.Name
+		if c.Close {
+			// The system font can draw this one, unlike the private-use
+			// glyphs the Omarchy panel uses. It marks a command that closes
+			// its terminal without adding a second clickable target.
+			title += "  \u23fb"
+		}
 		m.Items = append(m.Items, &Item{
-			Title:           c.Name,
+			Title:           title,
 			Tooltip:         "Run this in your default terminal",
 			SeparatorBefore: i == 0,
 			Action:          ActionRun,
 			Name:            c.Name,
 			Disabled:        busy,
 		})
+	}
+
+	if len(s.Commands) > 0 {
+		closeItem := &Item{
+			Title:    "Close after run",
+			Tooltip:  "End the terminal session when a command finishes",
+			Action:   ActionNone,
+			Disabled: busy,
+		}
+		for _, c := range s.Commands {
+			closeItem.Children = append(closeItem.Children, &Item{
+				Title:     c.Name,
+				Tooltip:   "Close the terminal after " + c.Name + " finishes",
+				Checked:   c.Close,
+				Checkable: true,
+				Action:    ActionToggleClose,
+				Name:      c.Name,
+				Disabled:  busy,
+			})
+		}
+		m.Items = append(m.Items, closeItem)
 	}
 
 	terminalItem := &Item{
@@ -313,6 +344,11 @@ func ForEdit(res cli.Result) Status {
 // ForTerminal builds the line that reports a saved terminal choice.
 func ForTerminal(res cli.Result) Status {
 	return forResult(res, "Terminal choice saved.", "Could not set the terminal.")
+}
+
+// ForClose builds the line that reports a saved close-after-run setting.
+func ForClose(res cli.Result) Status {
+	return forResult(res, "Close after run updated.", "Could not change Close after run.")
 }
 
 // forResult is the shape every completed action shares: a success uses the
